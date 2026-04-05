@@ -1,9 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import CreatableSelect from 'react-select/creatable';
 import { useAuth } from '../context/AuthContext';
 import { tripService } from '../services/tripService';
 import TransportStepBuilder from '../components/TransportStepBuilder';
 import { InlineSpinner } from '../components/LoadingSpinner';
+import PageTransition from '../components/PageTransition';
+import { DESTINATION_OPTIONS } from '../constants/locations';
+import { darkSelectStyles } from '../constants/reactSelectDarkTheme';
 
 const emptyStep = () => ({ mode: 'Cab', from: '', to: '', transportName: '', departureTime: '' });
 
@@ -13,15 +20,13 @@ export default function CreateTrip() {
   const [steps, setSteps] = useState([emptyStep()]);
   const [form, setForm] = useState({ destination: '', travelDate: '', preferredSex: 'Any', companionUntilStep: '', additionalDetails: '', maxCompanions: 4 });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     if (steps.some(s => !s.from || !s.to)) {
-      setError('Please fill in From and To for all transport steps.');
+      toast.error('Please fill in From and To for all transport steps.');
       return;
     }
     setLoading(true);
@@ -33,16 +38,17 @@ export default function CreateTrip() {
         maxCompanions: parseInt(form.maxCompanions),
       };
       const res = await tripService.create(payload);
+      toast.success('Trip created!');
       navigate(`/trips/${res.data.trip._id}`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create trip.');
+      toast.error(err.response?.data?.message || 'Failed to create trip.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
+    <PageTransition className="max-w-3xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold text-white mb-2">Create a Trip</h1>
         <div className="flex items-center gap-2 text-sm text-white/40">
@@ -50,10 +56,6 @@ export default function CreateTrip() {
           You will be the organizer of this trip
         </div>
       </div>
-
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 mb-6">{error}</div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Basic info */}
@@ -65,11 +67,27 @@ export default function CreateTrip() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Final Destination</label>
-              <input type="text" value={form.destination} onChange={set('destination')} placeholder="e.g. Chennai, Bangalore" className="input-field" required />
+              <CreatableSelect
+                options={DESTINATION_OPTIONS}
+                styles={darkSelectStyles}
+                value={form.destination ? { value: form.destination, label: form.destination } : null}
+                onChange={opt => setForm(f => ({ ...f, destination: opt?.value || '' }))}
+                placeholder="e.g. Chennai, Bangalore"
+                isClearable
+                formatCreateLabel={val => `Use "${val}"`}
+              />
             </div>
             <div>
               <label className="label">Travel Date</label>
-              <input type="date" value={form.travelDate} onChange={set('travelDate')} className="input-field" required min={new Date().toISOString().split('T')[0]} />
+              <DatePicker
+                selected={form.travelDate ? new Date(form.travelDate) : null}
+                onChange={date => setForm(f => ({ ...f, travelDate: date ? date.toISOString().split('T')[0] : '' }))}
+                minDate={new Date()}
+                dateFormat="EEE, MMM d yyyy"
+                placeholderText="Pick a date"
+                className="input-field w-full"
+                required
+              />
             </div>
             <div>
               <label className="label">Preferred Companion Gender</label>
@@ -145,6 +163,6 @@ export default function CreateTrip() {
           </button>
         </div>
       </form>
-    </div>
+    </PageTransition>
   );
 }

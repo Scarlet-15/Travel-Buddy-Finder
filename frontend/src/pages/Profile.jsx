@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
+import { Map, Handshake } from 'lucide-react';
+import PageTransition from '../components/PageTransition';
 import { useAuth } from '../context/AuthContext';
 import { userService, tripService } from '../services/tripService';
 import TripCard from '../components/TripCard';
-import LoadingSpinner, { InlineSpinner } from '../components/LoadingSpinner';
+import ProfileSkeleton from '../components/ProfileSkeleton';
+import { InlineSpinner } from '../components/LoadingSpinner';
 
 export default function Profile() {
   const { user, setUser } = useAuth();
@@ -14,7 +18,6 @@ export default function Profile() {
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ name: user?.name || '', phone: user?.phone || '' });
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState('');
 
   useEffect(() => {
     Promise.all([tripService.getMyOrganized(), tripService.getMyJoined()])
@@ -31,17 +34,16 @@ export default function Profile() {
     try {
       const res = await userService.updateProfile(form);
       setUser(res.data.user);
-      setSaveMsg('Profile updated!');
+      toast.success('Profile updated!');
       setEditMode(false);
-      setTimeout(() => setSaveMsg(''), 3000);
     } catch (err) {
-      setSaveMsg('Failed to update.');
+      toast.error('Failed to update profile.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <LoadingSpinner text="Loading profile..." />;
+  if (loading) return <ProfileSkeleton />;
 
   const tabs = [
     { key: 'organized', label: `Organized (${organized.length})` },
@@ -49,7 +51,7 @@ export default function Profile() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
+    <PageTransition className="max-w-4xl mx-auto px-4 py-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Profile card */}
         <div className="md:col-span-1">
@@ -61,12 +63,6 @@ export default function Profile() {
               <h2 className="font-display font-bold text-white text-xl">{user?.name}</h2>
               <p className="text-white/40 text-sm mt-0.5">{user?.registerNumber}</p>
             </div>
-
-            {saveMsg && (
-              <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-xs rounded-lg px-3 py-2 mb-4 text-center">
-                {saveMsg}
-              </div>
-            )}
 
             {editMode ? (
               <form onSubmit={handleSave} className="space-y-3">
@@ -130,7 +126,7 @@ export default function Profile() {
             <div className="space-y-3">
               {organized.length === 0 ? (
                 <div className="card p-10 text-center">
-                  <div className="text-4xl mb-3">🗺️</div>
+                  <div className="flex justify-center mb-3"><Map className="w-8 h-8 text-white/20" /></div>
                   <p className="text-white/40">No trips organized yet.</p>
                 </div>
               ) : organized.map(trip => <TripCard key={trip._id} trip={trip} showOrganizer={false} />)}
@@ -141,7 +137,7 @@ export default function Profile() {
             <div className="space-y-3">
               {joined.filter(Boolean).length === 0 ? (
                 <div className="card p-10 text-center">
-                  <div className="text-4xl mb-3">🤝</div>
+                  <div className="flex justify-center mb-3"><Handshake className="w-8 h-8 text-white/20" /></div>
                   <p className="text-white/40">No approved trips joined yet.</p>
                 </div>
               ) : joined.filter(Boolean).map(trip => trip && <TripCard key={trip._id} trip={trip} />)}
@@ -149,6 +145,6 @@ export default function Profile() {
           )}
         </div>
       </div>
-    </div>
+    </PageTransition>
   );
 }

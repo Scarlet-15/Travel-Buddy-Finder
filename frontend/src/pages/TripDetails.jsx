@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { tripService, joinRequestService } from '../services/tripService';
-import LoadingSpinner, { InlineSpinner } from '../components/LoadingSpinner';
-
-const modeIcons = { Cab: '🚕', Train: '🚂', Flight: '✈️', Bus: '🚌', Metro: '🚇', Auto: '🛺' };
+import { InlineSpinner } from '../components/LoadingSpinner';
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Phone, CheckCircle, Clock, XCircle } from 'lucide-react';
+import CreatableSelect from 'react-select/creatable';
+import PageTransition from '../components/PageTransition';
+import ConfirmModal from '../components/ConfirmModal';
+import { modeIcons, fallbackModeIcon } from '../constants/icons';
+import { DESTINATION_OPTIONS } from '../constants/locations';
+import { darkSelectStyles } from '../constants/reactSelectDarkTheme';
 
 export default function TripDetails() {
   const { id } = useParams();
@@ -16,10 +25,9 @@ export default function TripDetails() {
   const [showJoinForm, setShowJoinForm] = useState(false);
   const [joinForm, setJoinForm] = useState({ finalDestination: '', joinUntilStep: '', message: '' });
   const [joinLoading, setJoinLoading] = useState(false);
-  const [joinError, setJoinError] = useState('');
-  const [joinSuccess, setJoinSuccess] = useState(false);
   const [requestStatus, setRequestStatus] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     tripService.getById(id)
@@ -36,7 +44,6 @@ export default function TripDetails() {
 
   const handleJoin = async (e) => {
     e.preventDefault();
-    setJoinError('');
     setJoinLoading(true);
     try {
       await joinRequestService.create({
@@ -46,24 +53,24 @@ export default function TripDetails() {
         travelDate: trip.travelDate,
         message: joinForm.message,
       });
-      setJoinSuccess(true);
+      toast.success('Join request sent! The organizer will review it soon.');
       setShowJoinForm(false);
       setRequestStatus('pending');
     } catch (err) {
-      setJoinError(err.response?.data?.message || 'Failed to send join request.');
+      toast.error(err.response?.data?.message || 'Failed to send join request.');
     } finally {
       setJoinLoading(false);
     }
   };
 
   const handleCancel = async () => {
-    if (!confirm('Cancel this trip?')) return;
+    setShowConfirm(false);
     setCancelLoading(true);
     try {
       await tripService.cancel(id);
       navigate('/dashboard');
     } catch (e) {
-      alert('Failed to cancel trip.');
+      toast.error('Failed to cancel trip.');
     } finally {
       setCancelLoading(false);
     }
@@ -74,12 +81,45 @@ export default function TripDetails() {
       await joinRequestService.updateStatus(requestId, status);
       const res = await tripService.getById(id);
       setTrip(res.data.trip);
+      toast.success(`Request ${status}.`);
     } catch (e) {
-      alert('Failed to update request.');
+      toast.error('Failed to update request.');
     }
   };
 
-  if (loading) return <LoadingSpinner text="Loading trip details..." />;
+  if (loading) return (
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <Skeleton width={60} height={16} style={{ marginBottom: 12 }} />
+      <Skeleton width="50%" height={32} style={{ marginBottom: 8 }} />
+      <Skeleton width={180} height={16} style={{ marginBottom: 24 }} />
+      <div className="card p-5 mb-4">
+        <Skeleton width={80} height={12} style={{ marginBottom: 12 }} />
+        <div className="flex items-center gap-3">
+          <Skeleton circle width={40} height={40} />
+          <div className="flex-1">
+            <Skeleton width={140} height={16} />
+            <Skeleton width={200} height={14} style={{ marginTop: 4 }} />
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <Skeleton height={72} borderRadius={16} />
+        <Skeleton height={72} borderRadius={16} />
+      </div>
+      <div className="card p-5 mb-4">
+        <Skeleton width={120} height={12} style={{ marginBottom: 16 }} />
+        {[1, 2].map(i => (
+          <div key={i} className="flex gap-3 mb-3">
+            <Skeleton width={32} height={32} borderRadius={8} />
+            <div className="flex-1">
+              <Skeleton width="70%" height={16} />
+              <Skeleton width="40%" height={12} style={{ marginTop: 4 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
   if (!trip) return null;
 
   const isOrganizer = trip.organizerId?._id === user._id || trip.organizerId === user._id;
@@ -87,12 +127,12 @@ export default function TripDetails() {
   const pendingRequests = trip.joinRequests?.filter(r => r.status === 'pending') || [];
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
+    <PageTransition className="max-w-3xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <button onClick={() => navigate(-1)} className="text-white/40 hover:text-white text-sm mb-3 flex items-center gap-1 transition-colors">
-            ← Back
+            <ArrowLeft className="w-4 h-4" /> Back
           </button>
           <h1 className="font-display text-3xl font-bold text-white">→ {trip.destination}</h1>
           <p className="text-white/40 mt-1">{trip.travelDate ? format(new Date(trip.travelDate), 'EEEE, MMMM d, yyyy') : ''}</p>
@@ -103,12 +143,6 @@ export default function TripDetails() {
           {trip.status}
         </div>
       </div>
-
-      {joinSuccess && (
-        <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-sm rounded-xl px-4 py-3 mb-6">
-          ✅ Join request sent! The organizer will review it soon.
-        </div>
-      )}
 
       {/* Organizer card */}
       <div className="card p-5 mb-4">
@@ -123,7 +157,7 @@ export default function TripDetails() {
           </div>
           {!isOrganizer && (
             <a href={`tel:${trip.organizerId?.phone}`} className="ml-auto text-brand-400 text-sm hover:underline">
-              📞 {trip.organizerId?.phone}
+              <Phone className="w-3.5 h-3.5 inline" /> {trip.organizerId?.phone}
             </a>
           )}
         </div>
@@ -147,11 +181,13 @@ export default function TripDetails() {
       <div className="card p-5 mb-4">
         <h2 className="text-xs text-white/40 uppercase tracking-wider font-medium mb-4">Transport Plan</h2>
         <div className="space-y-3">
-          {trip.transportSteps?.map((step, i) => (
+          {trip.transportSteps?.map((step, i) => {
+            const Icon = modeIcons[step.mode] || fallbackModeIcon;
+            return (
             <div key={i} className="flex gap-3">
               <div className="flex flex-col items-center">
-                <div className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-sm">
-                  {modeIcons[step.mode]}
+                <div className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-sm text-brand-400">
+                  <Icon className="w-4 h-4" />
                 </div>
                 {i < trip.transportSteps.length - 1 && <div className="w-px h-6 bg-white/10 my-1" />}
               </div>
@@ -168,7 +204,8 @@ export default function TripDetails() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -244,14 +281,14 @@ export default function TripDetails() {
             requestStatus === 'pending' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
             'bg-red-500/10 text-red-400 border border-red-500/20'
           }`}>
-            {requestStatus === 'approved' && '✅ You are joining this trip!'}
-            {requestStatus === 'pending' && '⏳ Join request pending organizer approval'}
-            {requestStatus === 'rejected' && '❌ Your join request was not approved'}
+            {requestStatus === 'approved' && <span className="flex items-center justify-center gap-2"><CheckCircle className="w-4 h-4" /> You are joining this trip!</span>}
+            {requestStatus === 'pending' && <span className="flex items-center justify-center gap-2"><Clock className="w-4 h-4" /> Join request pending organizer approval</span>}
+            {requestStatus === 'rejected' && <span className="flex items-center justify-center gap-2"><XCircle className="w-4 h-4" /> Your join request was not approved</span>}
           </div>
         )}
 
         {isOrganizer && trip.status === 'open' && (
-          <button onClick={handleCancel} disabled={cancelLoading} className="btn-danger w-full flex items-center justify-center gap-2">
+          <button onClick={() => setShowConfirm(true)} disabled={cancelLoading} className="btn-danger w-full flex items-center justify-center gap-2">
             {cancelLoading ? <InlineSpinner /> : null} Cancel Trip
           </button>
         )}
@@ -259,19 +296,19 @@ export default function TripDetails() {
 
       {/* Join form */}
       {showJoinForm && (
-        <div className="card p-6 mt-4 border-brand-500/20 animate-slide-up">
+        <motion.div className="card p-6 mt-4 border-brand-500/20" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <h3 className="font-display font-semibold text-white mb-4">Join Request</h3>
-          {joinError && <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 mb-4">{joinError}</div>}
           <form onSubmit={handleJoin} className="space-y-4">
             <div>
               <label className="label">Your Final Destination</label>
-              <input
-                type="text"
-                value={joinForm.finalDestination}
-                onChange={e => setJoinForm(f => ({ ...f, finalDestination: e.target.value }))}
+              <CreatableSelect
+                options={DESTINATION_OPTIONS}
+                styles={darkSelectStyles}
+                value={joinForm.finalDestination ? { value: joinForm.finalDestination, label: joinForm.finalDestination } : null}
+                onChange={opt => setJoinForm(f => ({ ...f, finalDestination: opt?.value || '' }))}
                 placeholder="Where are you heading?"
-                className="input-field"
-                required
+                isClearable
+                formatCreateLabel={val => `Use "${val}"`}
               />
             </div>
             <div>
@@ -306,8 +343,16 @@ export default function TripDetails() {
               </button>
             </div>
           </form>
-        </div>
+        </motion.div>
       )}
-    </div>
+
+      <ConfirmModal
+        isOpen={showConfirm}
+        onConfirm={handleCancel}
+        onCancel={() => setShowConfirm(false)}
+        title="Cancel Trip"
+        message="Are you sure you want to cancel this trip? This action cannot be undone."
+      />
+    </PageTransition>
   );
 }

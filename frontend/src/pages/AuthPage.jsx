@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { TrainFront, Lock, Wallet, Shield } from 'lucide-react';
+import PageTransition from '../components/PageTransition';
 import { useAuth } from '../context/AuthContext';
 import { InlineSpinner } from '../components/LoadingSpinner';
 
@@ -9,16 +12,14 @@ export default function AuthPage({ mode }) {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: '', email: '', phone: '', registerNumber: '', password: '' });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     if (!form.email.endsWith('@nitt.edu')) {
-      setError('Only @nitt.edu email addresses are allowed.');
+      toast.error('Only @nitt.edu email addresses are allowed.');
       return;
     }
     setLoading(true);
@@ -30,7 +31,7 @@ export default function AuthPage({ mode }) {
       }
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Something went wrong.');
+      toast.error(err.response?.data?.message || 'Something went wrong.');
     } finally {
       setLoading(false);
     }
@@ -43,8 +44,8 @@ export default function AuthPage({ mode }) {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(249,115,22,0.15),transparent_60%)]" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-              <span className="text-xl">🚂</span>
+            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center text-white">
+              <TrainFront className="w-5 h-5" />
             </div>
             <div>
               <div className="font-display font-bold text-white text-xl">TravelBuddy Finder</div>
@@ -60,12 +61,12 @@ export default function AuthPage({ mode }) {
         </div>
         <div className="relative z-10 space-y-3">
           {[
-            { icon: '🔒', text: 'For the fellow people of NIT Trichy' },
-            { icon: '💰', text: 'Split travel costs with batchmates' },
-            { icon: '🛡️', text: 'Travel safely with verified students' },
+            { icon: Lock, text: 'For the fellow people of NIT Trichy' },
+            { icon: Wallet, text: 'Split travel costs with batchmates' },
+            { icon: Shield, text: 'Travel safely with verified students' },
           ].map((f, i) => (
             <div key={i} className="flex items-center gap-3 text-white/50 text-sm">
-              <span>{f.icon}</span><span>{f.text}</span>
+              <f.icon className="w-4 h-4" /><span>{f.text}</span>
             </div>
           ))}
         </div>
@@ -73,7 +74,7 @@ export default function AuthPage({ mode }) {
 
       {/* Right panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md animate-slide-up">
+        <PageTransition className="w-full max-w-md">
           <div className="mb-8">
             <h2 className="font-display text-3xl font-bold text-white mb-2">
               {isLogin ? 'Welcome back' : 'Join TravelBuddy'}
@@ -85,12 +86,6 @@ export default function AuthPage({ mode }) {
               </Link>
             </p>
           </div>
-
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 mb-6">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
@@ -132,7 +127,7 @@ export default function AuthPage({ mode }) {
               {loading ? <><InlineSpinner /> Processing...</> : (isLogin ? 'Sign In' : 'Create Account')}
             </button>
           </form>
-        </div>
+        </PageTransition>
       </div>
     </div>
   );

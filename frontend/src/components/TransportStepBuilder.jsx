@@ -1,5 +1,10 @@
-const MODES = ['Cab', 'Train', 'Flight', 'Bus', 'Metro', 'Auto'];
-const modeIcons = { Cab: '🚕', Train: '🚂', Flight: '✈️', Bus: '🚌', Metro: '🚇', Auto: '🛺' };
+import { Plus, Trash2 } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import CreatableSelect from 'react-select/creatable';
+import { modeIcons, MODES } from '../constants/icons';
+import { LOCATION_OPTIONS } from '../constants/locations';
+import { darkSelectStyles } from '../constants/reactSelectDarkTheme';
 
 const emptyStep = () => ({ mode: 'Cab', from: '', to: '', transportName: '', departureTime: '' });
 
@@ -28,9 +33,9 @@ export default function TransportStepBuilder({ steps, onChange }) {
               <button
                 type="button"
                 onClick={() => removeStep(index)}
-                className="text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+                className="text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 flex items-center gap-1"
               >
-                Remove
+                <Trash2 className="w-3.5 h-3.5" /> Remove
               </button>
             )}
           </div>
@@ -39,44 +44,49 @@ export default function TransportStepBuilder({ steps, onChange }) {
           <div className="mb-3">
             <label className="label">Transport Mode</label>
             <div className="flex flex-wrap gap-2">
-              {MODES.map(mode => (
-                <button
-                  type="button"
-                  key={mode}
-                  onClick={() => update(index, 'mode', mode)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                    step.mode === mode
-                      ? 'bg-brand-500 text-white'
-                      : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {modeIcons[mode]} {mode}
-                </button>
-              ))}
+              {MODES.map(m => {
+                const Icon = modeIcons[m];
+                return (
+                  <button
+                    type="button"
+                    key={m}
+                    onClick={() => update(index, 'mode', m)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 flex items-center gap-1.5 ${
+                      step.mode === m
+                        ? 'bg-brand-500 text-white'
+                        : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" /> {m}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="label">From</label>
-              <input
-                type="text"
-                value={step.from}
-                onChange={e => update(index, 'from', e.target.value)}
+              <CreatableSelect
+                options={LOCATION_OPTIONS}
+                styles={darkSelectStyles}
+                value={step.from ? { value: step.from, label: step.from } : null}
+                onChange={opt => update(index, 'from', opt?.value || '')}
                 placeholder="e.g. NIT Trichy"
-                className="input-field"
-                required
+                isClearable
+                formatCreateLabel={val => `Use "${val}"`}
               />
             </div>
             <div>
               <label className="label">To</label>
-              <input
-                type="text"
-                value={step.to}
-                onChange={e => update(index, 'to', e.target.value)}
+              <CreatableSelect
+                options={LOCATION_OPTIONS}
+                styles={darkSelectStyles}
+                value={step.to ? { value: step.to, label: step.to } : null}
+                onChange={opt => update(index, 'to', opt?.value || '')}
                 placeholder="e.g. Trichy Railway Station"
-                className="input-field"
-                required
+                isClearable
+                formatCreateLabel={val => `Use "${val}"`}
               />
             </div>
             <div>
@@ -91,11 +101,14 @@ export default function TransportStepBuilder({ steps, onChange }) {
             </div>
             <div>
               <label className="label">Departure Time <span className="text-white/30">(optional)</span></label>
-              <input
-                type="datetime-local"
-                value={step.departureTime}
-                onChange={e => update(index, 'departureTime', e.target.value)}
-                className="input-field"
+              <DatePicker
+                selected={step.departureTime ? new Date(step.departureTime) : null}
+                onChange={d => update(index, 'departureTime', d ? d.toISOString() : '')}
+                showTimeSelect
+                dateFormat="MMM d, yyyy h:mm aa"
+                placeholderText="Pick date & time"
+                className="input-field w-full"
+                isClearable
               />
             </div>
           </div>
@@ -107,7 +120,7 @@ export default function TransportStepBuilder({ steps, onChange }) {
         onClick={addStep}
         className="w-full border-2 border-dashed border-white/10 hover:border-brand-500/40 rounded-xl py-3 text-sm text-white/40 hover:text-brand-400 transition-all duration-200 flex items-center justify-center gap-2"
       >
-        <span className="text-lg">+</span> Add Transport Step
+        <Plus className="w-5 h-5" /> Add Transport Step
       </button>
     </div>
   );

@@ -1,9 +1,7 @@
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-
-const modeIcons = {
-  Cab: '🚕', Train: '🚂', Flight: '✈️', Bus: '🚌', Metro: '🚇', Auto: '🛺',
-};
+import { motion } from 'framer-motion';
+import { modeIcons, fallbackModeIcon } from '../constants/icons';
 
 const statusColors = {
   open: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -17,6 +15,7 @@ export default function TripCard({ trip, showOrganizer = true }) {
   const approvedCount = joinRequests?.filter(r => r.status === 'approved')?.length || 0;
 
   return (
+    <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
     <Link to={`/trips/${_id}`} className="card p-5 block hover:border-brand-500/30 hover:bg-dark-700 transition-all duration-200 group">
       <div className="flex items-start justify-between mb-3">
         <div>
@@ -34,13 +33,16 @@ export default function TripCard({ trip, showOrganizer = true }) {
 
       {/* Transport steps summary */}
       <div className="flex flex-wrap items-center gap-1 mb-4">
-        {transportSteps?.map((step, i) => (
-          <span key={i} className="flex items-center gap-1 text-xs text-white/50">
-            {i > 0 && <span className="text-white/20">→</span>}
-            <span>{modeIcons[step.mode] || '🚗'}</span>
-            <span>{step.from}</span>
-          </span>
-        ))}
+        {transportSteps?.map((step, i) => {
+          const Icon = modeIcons[step.mode] || fallbackModeIcon;
+          return (
+            <span key={i} className="flex items-center gap-1 text-xs text-white/50">
+              {i > 0 && <span className="text-white/20">→</span>}
+              <Icon className="w-3.5 h-3.5" />
+              <span>{step.from}</span>
+            </span>
+          );
+        })}
         {transportSteps?.length > 0 && (
           <span className="flex items-center gap-1 text-xs text-white/50">
             <span className="text-white/20">→</span>
@@ -66,5 +68,6 @@ export default function TripCard({ trip, showOrganizer = true }) {
         </div>
       </div>
     </Link>
+    </motion.div>
   );
 }

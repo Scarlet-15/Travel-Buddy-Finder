@@ -68,6 +68,36 @@ VITE_API_URL=http://localhost:5000/api
 
 ## 🛠️ Setup Instructions
 
+### Option A: Docker (Recommended)
+
+The easiest way to get started. No need to install Node.js or MongoDB locally.
+
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+
+```bash
+# Start all services (MongoDB + Backend + Frontend)
+docker-compose up --build
+
+# Seed sample data (in a separate terminal)
+docker-compose exec backend node seed.js
+
+# Stop everything
+docker-compose down
+
+# Stop and remove all data (reset database)
+docker-compose down -v
+```
+
+The app will be available at:
+- **Frontend:** http://localhost:5173
+- **Backend API:** http://localhost:5000
+
+Source code is volume-mounted, so changes hot-reload without rebuilding.
+
+---
+
+### Option B: Manual Setup
+
 ### Prerequisites
 - Node.js v18+
 - MongoDB running locally or a MongoDB Atlas URI
@@ -100,10 +130,6 @@ cd backend
 node seed.js
 ```
 
-Test credentials after seeding:
-- **Email:** `arjun@nitt.edu` | **Password:** `password123`
-- **Email:** `priya@nitt.edu` | **Password:** `password123`
-
 ### 4. Run development servers
 
 ```bash
@@ -115,6 +141,15 @@ npm run dev   # runs on http://localhost:5000
 cd frontend
 npm run dev   # runs on http://localhost:5173
 ```
+
+---
+
+### Test Credentials (after seeding)
+
+| Email | Password |
+|-------|----------|
+| `arjun@nitt.edu` | `password123` |
+| `priya@nitt.edu` | `password123` |
 
 ---
 

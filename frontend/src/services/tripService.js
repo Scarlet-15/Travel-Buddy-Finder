@@ -8,6 +8,7 @@ export const tripService = {
   cancel: (id) => api.delete(`/trips/${id}`),
   getMyOrganized: () => api.get('/trips/my/organized'),
   getMyJoined: () => api.get('/trips/my/joined'),
+  createChatRoom: (id) => api.post(`/trips/${id}/chat`),
 };
 
 export const joinRequestService = {

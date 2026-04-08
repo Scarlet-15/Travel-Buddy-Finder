@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Map, Search, ChevronRight } from 'lucide-react';
+import { Map, Search, ChevronRight, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { tripService } from '../services/tripService';
+import { tripService, joinRequestService } from '../services/tripService';
 import TripCard from '../components/TripCard';
 import DashboardSkeleton from '../components/DashboardSkeleton';
 import PageTransition from '../components/PageTransition';
@@ -11,17 +11,29 @@ import PageTransition from '../components/PageTransition';
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
+const statusIcon = {
+  pending:  { Icon: Clock,        color: 'text-yellow-400' },
+  approved: { Icon: CheckCircle,  color: 'text-green-400'  },
+  rejected: { Icon: XCircle,      color: 'text-red-400'    },
+};
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [organized, setOrganized] = useState([]);
   const [joined, setJoined] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([tripService.getMyOrganized(), tripService.getMyJoined()])
-      .then(([org, join]) => {
+    Promise.all([
+      tripService.getMyOrganized(),
+      tripService.getMyJoined(),
+      joinRequestService.getMy(),
+    ])
+      .then(([org, join, reqs]) => {
         setOrganized(org.data.trips);
         setJoined(join.data.trips);
+        setMyRequests(reqs.data.joinRequests);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -31,6 +43,7 @@ export default function Dashboard() {
 
   const upcomingOrganized = organized.filter(t => t.status !== 'cancelled' && new Date(t.travelDate) >= new Date());
   const upcomingJoined = joined.filter(t => t && t.status !== 'cancelled' && new Date(t.travelDate) >= new Date());
+  const pendingRequests = myRequests.filter(r => r.status === 'pending');
 
   return (
     <PageTransition className="max-w-6xl mx-auto px-4 py-8">
@@ -79,6 +92,44 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {/* Pending join requests banner */}
+      {pendingRequests.length > 0 && (
+        <div className="mb-8 card p-5 border-yellow-500/20 bg-yellow-500/5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-yellow-400" />
+              <h2 className="font-display font-semibold text-yellow-400 text-sm">
+                Pending Join Requests ({pendingRequests.length})
+              </h2>
+            </div>
+            <Link to="/profile" className="text-xs text-brand-400 hover:underline">View all →</Link>
+          </div>
+          <motion.div className="space-y-2" variants={stagger} initial="hidden" animate="show">
+            {pendingRequests.slice(0, 3).map(req => {
+              const trip = req.tripId;
+              return (
+                <motion.div key={req._id} variants={item} className="flex items-center gap-3 bg-dark-800/60 rounded-xl px-4 py-3">
+                  <Clock className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">→ {trip?.destination || 'Unknown trip'}</p>
+                    <p className="text-white/40 text-xs">
+                      Organizer: {trip?.organizerId?.name} · Awaiting approval
+                    </p>
+                  </div>
+                  {trip && (
+                    <Link
+                      to={`/trips/${trip._id}`}
+                      className="flex-shrink-0 text-xs text-brand-400 hover:underline"
+                    >
+                      View
+                    </Link>
+                  )}
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+      )}
 
       {/* Upcoming trips */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

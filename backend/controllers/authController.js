@@ -10,19 +10,17 @@ const register = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { name, email, phone, registerNumber, password } = req.body;
+  const { name, gender, registerNumber, password } = req.body;
+  // Email is always derived from registerNumber
+  const email = `${registerNumber.trim().toLowerCase()}@nitt.edu`;
 
   try {
-    if (!email.endsWith('@nitt.edu')) {
-      return res.status(400).json({ message: 'Only @nitt.edu email addresses are allowed.' });
-    }
-
     const existingUser = await User.findOne({ $or: [{ email }, { registerNumber }] });
     if (existingUser) {
-      return res.status(409).json({ message: 'User with this email or register number already exists.' });
+      return res.status(409).json({ message: 'User with this register number already exists.' });
     }
 
-    const user = await User.create({ name, email, phone, registerNumber, password });
+    const user = await User.create({ name, email, gender, registerNumber, password });
     const token = generateToken(user._id);
 
     res.status(201).json({ message: 'Registration successful', token, user });

@@ -22,7 +22,7 @@ const createTrip = async (req, res) => {
 
     await User.findByIdAndUpdate(req.user._id, { $push: { createdTrips: trip._id } });
 
-    const populated = await trip.populate('organizerId', 'name email phone registerNumber');
+    const populated = await trip.populate('organizerId', 'name email gender registerNumber');
     res.status(201).json({ message: 'Trip created successfully', trip: populated });
   } catch (error) {
     console.error(error);
@@ -31,10 +31,16 @@ const createTrip = async (req, res) => {
 };
 
 // GET /api/trips - Get all trips (with optional search)
+// Female-only trips are hidden from non-female users
 const getTrips = async (req, res) => {
   try {
     const { search, date, mode } = req.query;
     let query = { status: 'open' };
+
+    // Gender filtering: hide Female-only trips from non-Female users
+    if (req.user.gender !== 'Female') {
+      query.preferredSex = { $ne: 'Female' };
+    }
 
     if (search) {
       query.$or = [
@@ -54,7 +60,7 @@ const getTrips = async (req, res) => {
     }
 
     const trips = await Trip.find(query)
-      .populate('organizerId', 'name email phone registerNumber')
+      .populate('organizerId', 'name email gender registerNumber')
       .populate({ path: 'joinRequests', match: { status: 'approved' }, select: 'userId' })
       .sort({ travelDate: 1 });
 
@@ -69,13 +75,19 @@ const getTrips = async (req, res) => {
 const getTripById = async (req, res) => {
   try {
     const trip = await Trip.findById(req.params.id)
-      .populate('organizerId', 'name email phone registerNumber')
+      .populate('organizerId', 'name email gender registerNumber')
       .populate({
         path: 'joinRequests',
-        populate: { path: 'userId', select: 'name email phone registerNumber' },
+        populate: { path: 'userId', select: 'name email gender registerNumber' },
       });
 
     if (!trip) return res.status(404).json({ message: 'Trip not found.' });
+
+    // Block non-female users from accessing female-only trips
+    if (trip.preferredSex === 'Female' && req.user.gender !== 'Female') {
+      return res.status(403).json({ message: 'This trip is for female travellers only.' });
+    }
+
     res.json({ trip });
   } catch (error) {
     console.error(error);
@@ -93,7 +105,7 @@ const updateTrip = async (req, res) => {
     }
 
     const updated = await Trip.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
-      .populate('organizerId', 'name email phone registerNumber');
+      .populate('organizerId', 'name email gender registerNumber');
 
     res.json({ message: 'Trip updated', trip: updated });
   } catch (error) {
@@ -123,8 +135,8 @@ const deleteTrip = async (req, res) => {
 const getMyOrganizedTrips = async (req, res) => {
   try {
     const trips = await Trip.find({ organizerId: req.user._id })
-      .populate('organizerId', 'name email phone')
-      .populate({ path: 'joinRequests', populate: { path: 'userId', select: 'name email phone' } })
+      .populate('organizerId', 'name email gender')
+      .populate({ path: 'joinRequests', populate: { path: 'userId', select: 'name email gender' } })
       .sort({ travelDate: -1 });
     res.json({ trips });
   } catch (error) {
@@ -138,7 +150,7 @@ const getMyJoinedTrips = async (req, res) => {
     const requests = await JoinRequest.find({ userId: req.user._id, status: 'approved' })
       .populate({
         path: 'tripId',
-        populate: { path: 'organizerId', select: 'name email phone' },
+        populate: { path: 'organizerId', select: 'name email gender' },
       });
     const trips = requests.map((r) => r.tripId);
     res.json({ trips });
@@ -147,4 +159,27 @@ const getMyJoinedTrips = async (req, res) => {
   }
 };
 
-module.exports = { createTrip, getTrips, getTripById, updateTrip, deleteTrip, getMyOrganizedTrips, getMyJoinedTrips };
+// POST /api/trips/:id/chat - Create chat room for a trip (organizer only)
+const createChatRoom = async (req, res) => {
+  try {
+    const trip = await Trip.findById(req.params.id);
+    if (!trip) return res.status(404).json({ message: 'Trip not found.' });
+    if (trip.organizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the organizer can create a chat room.' });
+    }
+
+    if (trip.chatRoomId) {
+      return res.json({ message: 'Chat room already exists.', chatRoomId: trip.chatRoomId });
+    }
+
+    const chatRoomId = `trip-${trip._id}-${Date.now()}`;
+    await Trip.findByIdAndUpdate(req.params.id, { chatRoomId });
+
+    res.json({ message: 'Chat room created.', chatRoomId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error creating chat room.' });
+  }
+};
+
+module.exports = { createTrip, getTrips, getTripById, updateTrip, deleteTrip, getMyOrganizedTrips, getMyJoinedTrips, createChatRoom };

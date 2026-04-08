@@ -7,14 +7,16 @@ import { tripService, joinRequestService } from '../services/tripService';
 import { InlineSpinner } from '../components/LoadingSpinner';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Phone, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, CheckCircle, Clock, XCircle, MessageCircle, Loader } from 'lucide-react';
 import CreatableSelect from 'react-select/creatable';
 import PageTransition from '../components/PageTransition';
 import ConfirmModal from '../components/ConfirmModal';
+import ChatRoom from '../components/ChatRoom';
 import { modeIcons, fallbackModeIcon } from '../constants/icons';
 import { DESTINATION_OPTIONS } from '../constants/locations';
 import { darkSelectStyles } from '../constants/reactSelectDarkTheme';
+import api from '../services/api';
 
 export default function TripDetails() {
   const { id } = useParams();
@@ -28,6 +30,8 @@ export default function TripDetails() {
   const [requestStatus, setRequestStatus] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
 
   useEffect(() => {
     tripService.getById(id)
@@ -87,6 +91,20 @@ export default function TripDetails() {
     }
   };
 
+  const handleCreateChat = async () => {
+    setCreatingChat(true);
+    try {
+      const res = await api.post(`/trips/${id}/chat`);
+      setTrip(prev => ({ ...prev, chatRoomId: res.data.chatRoomId }));
+      setShowChat(true);
+      toast.success('Chat room created!');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to create chat room.');
+    } finally {
+      setCreatingChat(false);
+    }
+  };
+
   if (loading) return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <Skeleton width={60} height={16} style={{ marginBottom: 12 }} />
@@ -106,18 +124,6 @@ export default function TripDetails() {
         <Skeleton height={72} borderRadius={16} />
         <Skeleton height={72} borderRadius={16} />
       </div>
-      <div className="card p-5 mb-4">
-        <Skeleton width={120} height={12} style={{ marginBottom: 16 }} />
-        {[1, 2].map(i => (
-          <div key={i} className="flex gap-3 mb-3">
-            <Skeleton width={32} height={32} borderRadius={8} />
-            <div className="flex-1">
-              <Skeleton width="70%" height={16} />
-              <Skeleton width="40%" height={12} style={{ marginTop: 4 }} />
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
   if (!trip) return null;
@@ -125,6 +131,9 @@ export default function TripDetails() {
   const isOrganizer = trip.organizerId?._id === user._id || trip.organizerId === user._id;
   const approvedRequests = trip.joinRequests?.filter(r => r.status === 'approved') || [];
   const pendingRequests = trip.joinRequests?.filter(r => r.status === 'pending') || [];
+
+  // Can open chat: organizer always, members if chatRoomId exists
+  const canOpenChat = trip.chatRoomId && (isOrganizer || requestStatus === 'approved');
 
   return (
     <PageTransition className="max-w-3xl mx-auto px-4 py-8">
@@ -155,10 +164,10 @@ export default function TripDetails() {
             <p className="text-white font-medium">{trip.organizerId?.name}</p>
             <p className="text-white/40 text-sm">{trip.organizerId?.email}</p>
           </div>
-          {!isOrganizer && (
-            <a href={`tel:${trip.organizerId?.phone}`} className="ml-auto text-brand-400 text-sm hover:underline">
-              <Phone className="w-3.5 h-3.5 inline" /> {trip.organizerId?.phone}
-            </a>
+          {trip.organizerId?.gender && (
+            <span className="ml-auto text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2 py-0.5 rounded-full">
+              {trip.organizerId.gender}
+            </span>
           )}
         </div>
       </div>
@@ -184,26 +193,26 @@ export default function TripDetails() {
           {trip.transportSteps?.map((step, i) => {
             const Icon = modeIcons[step.mode] || fallbackModeIcon;
             return (
-            <div key={i} className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <div className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-sm text-brand-400">
-                  <Icon className="w-4 h-4" />
+              <div key={i} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-sm text-brand-400">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  {i < trip.transportSteps.length - 1 && <div className="w-px h-6 bg-white/10 my-1" />}
                 </div>
-                {i < trip.transportSteps.length - 1 && <div className="w-px h-6 bg-white/10 my-1" />}
+                <div className="flex-1 pb-2">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-white font-medium text-sm">{step.from}</span>
+                    <span className="text-white/30">→</span>
+                    <span className="text-white font-medium text-sm">{step.to}</span>
+                  </div>
+                  <div className="flex gap-3 text-xs text-white/40">
+                    <span>{step.mode}</span>
+                    {step.transportName && <span>· {step.transportName}</span>}
+                    {step.departureTime && <span>· {step.departureTime}</span>}
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 pb-2">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-white font-medium text-sm">{step.from}</span>
-                  <span className="text-white/30">→</span>
-                  <span className="text-white font-medium text-sm">{step.to}</span>
-                </div>
-                <div className="flex gap-3 text-xs text-white/40">
-                  <span>{step.mode}</span>
-                  {step.transportName && <span>· {step.transportName}</span>}
-                  {step.departureTime && <span>· {step.departureTime}</span>}
-                </div>
-              </div>
-            </div>
             );
           })}
         </div>
@@ -236,7 +245,7 @@ export default function TripDetails() {
         </div>
       )}
 
-      {/* Organizer: manage requests */}
+      {/* Organizer: manage pending requests */}
       {isOrganizer && pendingRequests.length > 0 && (
         <div className="card p-5 mb-4 border-brand-500/20">
           <h2 className="text-xs text-brand-400 uppercase tracking-wider font-medium mb-3">
@@ -269,6 +278,27 @@ export default function TripDetails() {
 
       {/* Action buttons */}
       <div className="space-y-3">
+        {/* Chat button – organizer can create or open, members can open if exists */}
+        {isOrganizer && !trip.chatRoomId && (
+          <button
+            onClick={handleCreateChat}
+            disabled={creatingChat}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/40 bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 transition-colors font-medium text-sm"
+          >
+            {creatingChat ? <><Loader className="w-4 h-4 animate-spin" /> Creating chat room...</> : <><MessageCircle className="w-4 h-4" /> Create Group Chat Room</>}
+          </button>
+        )}
+
+        {canOpenChat && (
+          <button
+            onClick={() => setShowChat(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors font-medium text-sm"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Open Group Chat
+          </button>
+        )}
+
         {!isOrganizer && trip.status === 'open' && !requestStatus && !showJoinForm && (
           <button onClick={() => setShowJoinForm(true)} className="btn-primary w-full">
             Request to Join This Trip
@@ -278,11 +308,11 @@ export default function TripDetails() {
         {requestStatus && (
           <div className={`text-center py-3 rounded-xl text-sm font-medium ${
             requestStatus === 'approved' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-            requestStatus === 'pending' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+            requestStatus === 'pending'  ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
             'bg-red-500/10 text-red-400 border border-red-500/20'
           }`}>
             {requestStatus === 'approved' && <span className="flex items-center justify-center gap-2"><CheckCircle className="w-4 h-4" /> You are joining this trip!</span>}
-            {requestStatus === 'pending' && <span className="flex items-center justify-center gap-2"><Clock className="w-4 h-4" /> Join request pending organizer approval</span>}
+            {requestStatus === 'pending'  && <span className="flex items-center justify-center gap-2"><Clock className="w-4 h-4" /> Join request pending organizer approval</span>}
             {requestStatus === 'rejected' && <span className="flex items-center justify-center gap-2"><XCircle className="w-4 h-4" /> Your join request was not approved</span>}
           </div>
         )}
@@ -353,6 +383,17 @@ export default function TripDetails() {
         title="Cancel Trip"
         message="Are you sure you want to cancel this trip? This action cannot be undone."
       />
+
+      {/* Chat Room overlay */}
+      <AnimatePresence>
+        {showChat && trip.chatRoomId && (
+          <ChatRoom
+            chatRoomId={trip.chatRoomId}
+            tripDestination={trip.destination}
+            onClose={() => setShowChat(false)}
+          />
+        )}
+      </AnimatePresence>
     </PageTransition>
   );
 }

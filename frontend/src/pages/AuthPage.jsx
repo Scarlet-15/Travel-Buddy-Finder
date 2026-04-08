@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { TrainFront, Lock, Wallet, Shield } from 'lucide-react';
@@ -11,23 +11,29 @@ export default function AuthPage({ mode }) {
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ name: '', email: '', phone: '', registerNumber: '', password: '' });
+  const [form, setForm] = useState({ name: '', gender: '', registerNumber: '', password: '' });
+  const [derivedEmail, setDerivedEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
+  // Auto-derive email from registerNumber
+  useEffect(() => {
+    if (form.registerNumber.trim()) {
+      setDerivedEmail(`${form.registerNumber.trim().toLowerCase()}@nitt.edu`);
+    } else {
+      setDerivedEmail('');
+    }
+  }, [form.registerNumber]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.email.endsWith('@nitt.edu')) {
-      toast.error('Only @nitt.edu email addresses are allowed.');
-      return;
-    }
     setLoading(true);
     try {
       if (isLogin) {
         await login(form.email, form.password);
       } else {
-        await register(form);
+        await register({ ...form, email: derivedEmail });
       }
       navigate('/dashboard');
     } catch (err) {
@@ -96,27 +102,52 @@ export default function AuthPage({ mode }) {
                 </div>
                 <div>
                   <label className="label">Register Number</label>
-                  <input type="text" value={form.registerNumber} onChange={set('registerNumber')} placeholder="e.g. 206125001" className="input-field" required />
+                  <input
+                    type="text"
+                    value={form.registerNumber}
+                    onChange={set('registerNumber')}
+                    placeholder="e.g. 206125001"
+                    className="input-field"
+                    required
+                  />
+                </div>
+                {/* Auto-filled email - read only */}
+                <div>
+                  <label className="label">College Email <span className="text-white/30 text-xs">(auto-filled)</span></label>
+                  <input
+                    type="email"
+                    value={derivedEmail}
+                    readOnly
+                    className="input-field opacity-60 cursor-not-allowed select-none"
+                    placeholder="Will be auto-filled from Register Number"
+                  />
+                  <p className="text-xs text-white/30 mt-1">Automatically set as <span className="text-brand-400">regno@nitt.edu</span></p>
                 </div>
                 <div>
-                  <label className="label">Phone Number</label>
-                  <input type="tel" value={form.phone} onChange={set('phone')} placeholder="91-xxxxxxxxxx" className="input-field" required />
+                  <label className="label">Gender</label>
+                  <select value={form.gender} onChange={set('gender')} className="input-field" required>
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
               </>
             )}
 
-            <div>
-              <label className="label">College Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={set('email')}
-                placeholder="yourregno@nitt.edu"
-                className="input-field"
-                required
-              />
-              <p className="text-xs text-white/30 mt-1">Must be a valid @nitt.edu email address</p>
-            </div>
+            {isLogin && (
+              <div>
+                <label className="label">College Email</label>
+                <input
+                  type="email"
+                  value={form.email || ''}
+                  onChange={set('email')}
+                  placeholder="yourregno@nitt.edu"
+                  className="input-field"
+                  required
+                />
+              </div>
+            )}
 
             <div>
               <label className="label">Password</label>

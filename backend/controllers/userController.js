@@ -17,10 +17,10 @@ const getProfile = async (req, res) => {
 // PUT /api/users/profile
 const updateProfile = async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name } = req.body;
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { name, phone },
+      { name },
       { new: true, runValidators: true }
     ).select('-password');
     res.json({ message: 'Profile updated.', user });
